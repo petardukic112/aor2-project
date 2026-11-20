@@ -1,60 +1,70 @@
-I’ll inspect the repository structure and key files, then add a README with setup and usage details.# AOR2 KVM Virtualization Project
+# AOR2 KVM Virtualization Project
 
-A C-based Linux/KVM project that creates and runs virtual machines in 64-bit long mode. It builds a minimal guest program and uses `/dev/kvm` to configure VCPUs, memory, page tables, registers, and I/O exits.
+A minimal **Linux/KVM-based virtualization project** written in C, implementing a virtual machine capable of executing guest code in **64-bit x86 long mode**. The project uses the Linux KVM API to create and configure virtual machines, allocate guest memory, initialize page tables and CPU registers, and handle guest I/O and VM exits.
 
 ## Features
 
 - Linux KVM API integration
-- 64-bit x86 long mode
-- 4 KB and 2 MB guest page support
-- 2 MB, 4 MB, and 8 MB guest memory options
+- 64-bit x86 long mode execution
+- Support for 4 KB and 2 MB guest pages
+- Configurable guest memory: 2 MB, 4 MB, and 8 MB
 - Multiple guest execution using POSIX threads
-- Minimal guest binary loaded directly into guest memory
+- Minimal freestanding guest binary loaded directly into guest memory
 - Guest output through the `0xE9` debug I/O port
-- Basic guest HLT and VM shutdown handling
-- MIT licensed
+- Guest `HLT` instruction and VM shutdown handling
+- MIT license
 
 ## Project Structure
 
-| File | Description |
-|---|---|
-| `kvm_zadatak3.c` | KVM host implementation |
-| `guest.c` | Minimal freestanding guest program |
-| `guest.ld` | Linker script for creating the guest binary |
-| `Makefile` | Build rules for the host and guest |
-| `LICENSE` | MIT license |
+```text
+.
+├── kvm_zadatak3.c    # KVM host implementation
+├── guest.c           # Minimal freestanding guest program
+├── guest.ld          # Linker script for the guest binary
+├── Makefile          # Build rules for the host and guest
+└── LICENSE           # MIT license
+```
 
 ## Requirements
 
-- Linux with KVM support
-- A KVM-compatible CPU
-- `/dev/kvm` available and accessible
+- Linux operating system with KVM support
+- A KVM-compatible CPU with hardware virtualization enabled
+- Accessible `/dev/kvm` device
 - GCC
 - GNU `ld`
-- Make
+- GNU Make
 - POSIX threading support
 
-Check whether virtualization is enabled:
+Verify that KVM is available:
 
 ```bash
-ls /dev/kvm
+ls -l /dev/kvm
 ```
 
-## Building
+## Getting Started
 
-Build the KVM runner and guest image:
+### Clone the Repository
+
+```bash
+git clone https://github.com/petardukic112/aor2-kvm.git
+cd aor2-kvm
+```
+
+### Build the Project
+
+Build the KVM host program and guest image:
 
 ```bash
 make
 ```
 
-This creates:
+This generates:
 
-- `kvm_zadatak3`
-- `guest.o`
-- `guest.img`
+- `kvm_zadatak3` – host-side KVM virtual machine runner
+- `guest.o` – compiled guest object file
+- `guest.img` – guest binary image
 
-Remove generated files:
+To remove generated files:
 
 ```bash
 make clean
@@ -62,7 +72,9 @@ make clean
 
 ## Running
 
-The host program currently accepts memory, page-size, and guest-image arguments:
+The host program accepts memory size, page size, and guest image arguments.
+
+Example:
 
 ```bash
 ./kvm_zadatak3 \
@@ -71,18 +83,15 @@ The host program currently accepts memory, page-size, and guest-image arguments:
   --guest guest.img
 ```
 
-Supported argument values:
+### Command-Line Arguments
 
-- `--memory` / `-m`
-  - `2` → 2 MB memory
-  - `4` → 4 MB memory
-  - `8` → 8 MB memory
-- `--page` / `-p`
-  - `2` → 2 MB pages
-  - `4` → 4 KB pages
-- `--guest` / `-g` → guest binary image
+| Argument | Description | Supported values |
+|---|---|---|
+| `--memory`, `-m` | Guest memory size in MB | `2`, `4`, `8` |
+| `--page`, `-p` | Guest page size in MB or KB | `2` (2 MB), `4` (4 KB) |
+| `--guest`, `-g` | Guest binary image | Path to guest image |
 
-Example guest output:
+### Example Output
 
 ```text
 Hello, world!
@@ -91,22 +100,38 @@ KVM_EXIT_HLT
 
 ## How It Works
 
-### Host VM
+### Host Virtual Machine
 
-The host program:
+The host program performs the following steps:
 
-1. Opens `/dev/kvm`.
-2. Creates a VM and virtual CPU.
-3. Allocates guest memory with `mmap`.
-4. Configures the guest memory region.
-5. Initializes the PML4, PDPT, PD, and page tables.
-6. Enables PAE, protected mode, paging, and 64-bit long mode.
-7. Loads `guest.img` at guest address `0x8000`.
-8. Starts the CPU with `KVM_RUN`.
-9. Handles guest I/O and halt exits.
+1. Opens `/dev/kvm` and initializes the KVM interface.
+2. Creates a virtual machine and a virtual CPU (VCPU).
+3. Allocates guest physical memory using `mmap`.
+4. Registers the guest memory region with KVM.
+5. Initializes the guest page tables (PML4, PDPT, and PD).
+6. Configures CPU registers and control registers to enable PAE, protected mode, paging, and 64-bit long mode.
+7. Loads `guest.img` into guest memory at address `0x8000`.
+8. Starts guest execution using `KVM_RUN`.
+9. Handles VM exits, including I/O operations and guest halt instructions.
 
 ### Guest Program
 
-The guest is a freestanding C program placed at the `.start` section. It writes `Hello, world!\n` to I/O port `0xE9`, then executes `hlt` repeatedly.
+The guest is a minimal freestanding C program compiled and linked independently of the host application.
 
-This project was created as an operating systems/virtualization exercise focused on low-level Linux KVM usage and x86-64 paging.
+It is loaded at guest physical address `0x8000` and executes in 64-bit long mode. The program writes `Hello, world!\n` to the debug I/O port `0xE9`, then executes the `hlt` instruction.
+
+The host handles the resulting VM exit and terminates guest execution.
+
+## Technical Details
+
+- **Virtualization:** Linux Kernel-based Virtual Machine (KVM)
+- **Architecture:** x86-64
+- **Execution mode:** 64-bit long mode
+- **Memory management:** Guest physical memory backed by `mmap`
+- **Paging:** 4 KB and 2 MB pages
+- **Concurrency:** POSIX threads for multiple guest execution
+- **Guest I/O:** Port-mapped I/O using port `0xE9`
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
